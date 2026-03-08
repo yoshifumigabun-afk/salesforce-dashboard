@@ -264,7 +264,7 @@ export default function Dashboard() {
                 <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
 
                 {/* Global Filters Header */}
-                <header className="px-8 py-5 border-b border-slate-800/60 bg-slate-900/40 backdrop-blur-md z-10 flex flex-wrap gap-6 items-center justify-between">
+                <header className="px-8 py-5 border-b border-slate-800/60 bg-slate-900/40 backdrop-blur-md relative z-30 flex flex-wrap gap-6 items-center justify-between">
                     <div className="flex flex-wrap gap-6 items-center">
                         <div className="flex items-center gap-2 text-slate-400 mr-2">
                             <Filter className="w-4 h-4" />

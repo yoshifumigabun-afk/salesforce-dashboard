@@ -270,19 +270,46 @@ export default function GenreTab({ data, allData, selectedMonths }: Props) {
         return { yearlyGenreData: chartData, allGenresInChart, genreColors };
     }, [data]);
 
-    // ── Trend report for genre chart ────────────────────────────────────────
+    // ── Trend report for ALL genres (not filtered by min-share) ────────────
     const genreTrendReport = useMemo(() => {
         if (yearlyGenreData.length < 2) return [];
-        const years = yearlyGenreData.map(d => d.year as number);
-        const report: { genre: string; direction: 'up' | 'down' | 'flat'; pct: number }[] = [];
-        allGenresInChart.forEach(genre => {
-            const vals = years.map(y => yearlyGenreData.find(d => d.year === y)?.[genre] as number || 0);
-            const first = vals[0]; const last = vals[vals.length - 1];
-            const p = pct(last, first);
-            if (p !== null) report.push({ genre, direction: p > 2 ? 'up' : p < -2 ? 'down' : 'flat', pct: p });
+
+        // Build a fresh per-year, per-genre totals from `data` directly
+        // so we capture every genre, including minor ones.
+        const yearSet = new Set<number>();
+        const genreSet = new Set<string>();
+        const genreYearSales = new Map<string, Map<number, number>>();
+
+        data.forEach(d => {
+            if (d.isBudget) return;
+            yearSet.add(d.year);
+            genreSet.add(d.genre);
+            if (!genreYearSales.has(d.genre)) genreYearSales.set(d.genre, new Map());
+            const ym = genreYearSales.get(d.genre)!;
+            ym.set(d.year, (ym.get(d.year) || 0) + d.sales);
         });
+
+        const sortedYears = Array.from(yearSet).sort();
+        const report: { genre: string; direction: 'up' | 'down' | 'flat'; pct: number; firstSales: number; lastSales: number }[] = [];
+
+        genreSet.forEach(genre => {
+            const ym = genreYearSales.get(genre)!;
+            const firstSales = ym.get(sortedYears[0]) || 0;
+            const lastSales = ym.get(sortedYears[sortedYears.length - 1]) || 0;
+            const p = pct(lastSales, firstSales);
+            if (p !== null) {
+                report.push({
+                    genre,
+                    direction: p > 2 ? 'up' : p < -2 ? 'down' : 'flat',
+                    pct: p,
+                    firstSales,
+                    lastSales,
+                });
+            }
+        });
+
         return report.sort((a, b) => b.pct - a.pct);
-    }, [yearlyGenreData, allGenresInChart]);
+    }, [data, yearlyGenreData]);
 
     // ── Per-category stats (for current filter) ────────────────────────────
     const categoryStats = useMemo(() => {
@@ -328,21 +355,32 @@ export default function GenreTab({ data, allData, selectedMonths }: Props) {
             {genreTrendReport.length > 0 && (
                 <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-md">
                     <h3 className="text-sm font-semibold text-slate-400 mb-4 flex items-center gap-2">
-                        トレンドレポート（全期間 比較）
+                        ジャンル増減レポート（全ジャンル）
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {genreTrendReport.map(({ genre, direction, pct: p }) => (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {genreTrendReport.map(({ genre, direction, pct: p, firstSales, lastSales }) => (
                             <div key={genre} className={cn(
-                                'flex items-center justify-between px-4 py-3 rounded-xl border text-sm',
-                                direction === 'up' ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
-                                    : direction === 'down' ? 'bg-rose-500/5 border-rose-500/20 text-rose-300'
-                                        : 'bg-slate-800/40 border-slate-700/50 text-slate-400'
+                                'flex flex-col px-4 py-3 rounded-xl border text-sm',
+                                direction === 'up' ? 'bg-emerald-500/5 border-emerald-500/20'
+                                    : direction === 'down' ? 'bg-rose-500/5 border-rose-500/20'
+                                        : 'bg-slate-800/40 border-slate-700/50'
                             )}>
-                                <span className="font-medium truncate mr-2">{genre}</span>
-                                <span className="flex items-center gap-1 text-xs font-bold shrink-0">
-                                    {direction === 'up' ? <TrendingUp className="w-3 h-3" /> : direction === 'down' ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                                    {Math.abs(p).toFixed(1)}%
-                                </span>
+                                <div className="flex items-center justify-between">
+                                    <span className={cn('font-medium truncate mr-2 text-sm',
+                                        direction === 'up' ? 'text-emerald-300' : direction === 'down' ? 'text-rose-300' : 'text-slate-400'
+                                    )}>{genre}</span>
+                                    <span className={cn('flex items-center gap-1 text-xs font-bold shrink-0',
+                                        direction === 'up' ? 'text-emerald-400' : direction === 'down' ? 'text-rose-400' : 'text-slate-500'
+                                    )}>
+                                        {direction === 'up' ? <TrendingUp className="w-3 h-3" /> : direction === 'down' ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                        {Math.abs(p).toFixed(1)}%
+                                    </span>
+                                </div>
+                                <div className="flex gap-3 mt-1.5 text-[11px] text-slate-500">
+                                    <span>比較元: ¥{(firstSales / 10000).toFixed(0)}万</span>
+                                    <span>→</span>
+                                    <span className={direction === 'up' ? 'text-emerald-500' : direction === 'down' ? 'text-rose-500' : ''}>最新: ¥{(lastSales / 10000).toFixed(0)}万</span>
+                                </div>
                             </div>
                         ))}
                     </div>
