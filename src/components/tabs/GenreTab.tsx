@@ -222,6 +222,7 @@ function CategoryDrilldown({ cat, allData, availableYears, selectedMonths, onClo
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function GenreTab({ data, allData, selectedMonths }: Props) {
     const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[0] | null>(null);
+    const [hoveredGenre, setHoveredGenre] = useState<string | null>(null);
 
     const availableYears = useMemo(() => {
         const years = new Set<number>();
@@ -257,7 +258,7 @@ export default function GenreTab({ data, allData, selectedMonths }: Props) {
             });
             if (otherTotal !== 0) row['その他'] = otherTotal;
             return row;
-        }).sort((a, b) => a.year - b.year);
+        }).sort((a, b) => b.year - a.year); // descending: newest year at top
 
         const mainGenresSorted = Array.from(totalByGenre.entries())
             .filter(([g]) => !minorGenres.has(g)).sort((a, b) => b[1] - a[1]).map(([g]) => g);
@@ -331,7 +332,7 @@ export default function GenreTab({ data, allData, selectedMonths }: Props) {
 
             {/* ── Year-by-genre stacked bar ─────────────────────────────── */}
             <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-md">
-                <h3 className="text-sm font-semibold text-slate-400 mb-6">年別ジャンル構成推移</h3>
+                <h3 className="text-sm font-semibold text-slate-400 mb-6">年別ジャンル構成推移（降順）</h3>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={yearlyGenreData} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
@@ -339,12 +340,43 @@ export default function GenreTab({ data, allData, selectedMonths }: Props) {
                             <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={v => `${(v / 100000000).toFixed(1)}億`} />
                             <YAxis type="category" dataKey="yearLabel" tick={{ fill: '#94a3b8', fontSize: 12 }} width={52} />
                             <Tooltip
-                                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', fontSize: '12px' }}
-                                formatter={(v: any, name: any) => [`¥${(v as number).toLocaleString()}`, String(name)]}
+                                cursor={{ fill: '#1e293b', opacity: 0.4 }}
+                                content={({ active, payload, label }) => {
+                                    if (active && payload && payload.length) {
+                                        const filteredPayload = hoveredGenre
+                                            ? payload.filter(p => p.dataKey === hoveredGenre)
+                                            : payload;
+                                        if (filteredPayload.length === 0) return null;
+                                        return (
+                                            <div className="bg-slate-900 border border-slate-800 p-3 rounded-lg shadow-xl">
+                                                <p className="text-slate-400 text-xs font-bold mb-2">{label}</p>
+                                                {filteredPayload.map((entry: any, index: number) => (
+                                                    <div key={index} className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                                        <span className="text-slate-200 text-sm font-medium">{entry.name}:</span>
+                                                        <span className="text-blue-400 text-sm font-bold">
+                                                            ¥{Number(entry.value).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }}
                             />
                             <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '12px', flexWrap: 'wrap' }} verticalAlign="bottom" align="center" />
                             {allGenresInChart.map(genre => (
-                                <Bar key={genre} dataKey={genre} stackId="a" fill={genreColors[genre]} radius={genre === allGenresInChart[allGenresInChart.length - 1] ? [0, 4, 4, 0] : [0, 0, 0, 0]} />
+                                <Bar
+                                    key={genre}
+                                    dataKey={genre}
+                                    stackId="a"
+                                    fill={genreColors[genre]}
+                                    radius={genre === allGenresInChart[allGenresInChart.length - 1] ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+                                    opacity={hoveredGenre && hoveredGenre !== genre ? 0.3 : 1}
+                                    onMouseEnter={() => setHoveredGenre(genre)}
+                                    onMouseLeave={() => setHoveredGenre(null)}
+                                />
                             ))}
                         </BarChart>
                     </ResponsiveContainer>
