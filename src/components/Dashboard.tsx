@@ -23,6 +23,7 @@ import StoreTab from './tabs/StoreTab';
 import StaffTab from './tabs/StaffTab';
 import GenreTab from './tabs/GenreTab';
 import Login from './Login';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 // Tabs Definition
 const TABS = [
@@ -104,57 +105,84 @@ export default function Dashboard() {
 
     // Global Filters State
     const [selectedYears, setSelectedYears] = useState<number[]>([]);
-    const [selectedStartMonth, setSelectedStartMonth] = useState<number | null>(null);
-    const [selectedEndMonth, setSelectedEndMonth] = useState<number | null>(null);
+    // null = all selected (no filter); array = specific selection
+    const [selectedMonths, setSelectedMonths] = useState<number[] | null>(null);
     const [selectedArea, setSelectedArea] = useState<string>('全エリア');
-    const [selectedStore, setSelectedStore] = useState<string>('全店舗');
-    const [selectedGenre, setSelectedGenre] = useState<string>('全ジャンル');
+    const [selectedStores, setSelectedStores] = useState<string[] | null>(null);
+    const [selectedGenres, setSelectedGenres] = useState<string[] | null>(null);
 
     // Derive filter constraints dynamically from loaded data
     // Base data filtering (Exclude future dates)
     const baseDashboardData = useMemo(() => {
         const TODAY = new Date('2026-03-08');
         return dashboardData.filter(d => {
-            // If it's a budget row (targetSales > 0), we might want to keep it or filter it. 
-            // Usually targets are set for the whole month. 
-            // But the user specifically said "除外してください".
             const itemDate = new Date(d.year, d.month - 1, d.day || 1);
             return itemDate <= TODAY;
         });
     }, [dashboardData]);
 
     const availableYears = Array.from(new Set(baseDashboardData.map(d => d.year))).sort((a, b) => a - b);
-    const availableMonths = Array.from({ length: 12 }, (_, i) => i + 1);
+    const allMonths = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: `${i + 1}月` }));
     const availableAreas = ['全エリア', ...Array.from(new Set(baseDashboardData.map(d => d.area)))];
-    const availableStores = ['全店舗', ...Array.from(new Set(baseDashboardData.filter(d => selectedArea === '全エリア' || d.area === selectedArea).map(d => d.store)))];
-    const availableGenres = ['全ジャンル', ...Array.from(new Set(baseDashboardData.map(d => d.genre)))];
+    const availableStores = Array.from(new Set(
+        baseDashboardData.filter(d => selectedArea === '全エリア' || d.area === selectedArea).map(d => d.store)
+    )).sort();
+    const availableGenres = Array.from(new Set(baseDashboardData.map(d => d.genre))).sort();
+
+    // Reset store selection when area changes
+    useEffect(() => { setSelectedStores(null); }, [selectedArea]);
 
     // Filter Data
     const filteredData = useMemo(() => {
+        if (selectedStores !== null && selectedStores.length === 0) return [];
+        if (selectedGenres !== null && selectedGenres.length === 0) return [];
+        if (selectedMonths !== null && selectedMonths.length === 0) return [];
         return getFilteredData(baseDashboardData, {
             years: selectedYears,
-            startMonth: selectedStartMonth,
-            endMonth: selectedEndMonth,
+            months: selectedMonths !== null ? selectedMonths : undefined,
             areas: selectedArea !== '全エリア' ? [selectedArea] : undefined,
-            stores: selectedStore !== '全店舗' ? [selectedStore] : undefined,
-            genres: selectedGenre !== '全ジャンル' ? [selectedGenre] : undefined,
+            stores: selectedStores !== null ? selectedStores : undefined,
+            genres: selectedGenres !== null ? selectedGenres : undefined,
         });
-    }, [selectedYears, selectedStartMonth, selectedEndMonth, selectedArea, selectedStore, selectedGenre, baseDashboardData]);
+    }, [selectedYears, selectedMonths, selectedArea, selectedStores, selectedGenres, baseDashboardData]);
 
     const toggleYear = (year: number) => {
         setSelectedYears(prev =>
             prev.includes(year) ? prev.filter(y => y !== year) : [...prev, year].sort()
         );
     };
+    const toggleMonth = (month: number) => {
+        setSelectedMonths(prev => {
+            if (prev === null) return allMonths.map(m => m.value).filter(m => m !== month);
+            const next = prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month].sort((a, b) => a - b);
+            return next.length === 12 ? null : next;
+        });
+    };
+    const toggleStore = (store: string) => {
+        setSelectedStores(prev => {
+            if (prev === null) return availableStores.filter(s => s !== store);
+            const next = prev.includes(store) ? prev.filter(s => s !== store) : [...prev, store];
+            return next.length === availableStores.length ? null : next;
+        });
+    };
+    const toggleGenre = (genre: string) => {
+        setSelectedGenres(prev => {
+            if (prev === null) return availableGenres.filter(g => g !== genre);
+            const next = prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre];
+            return next.length === availableGenres.length ? null : next;
+        });
+    };
 
     // Data for Trends & Summary (Filtered by geography/genre, but NOT year/month)
     const trendData = useMemo(() => {
+        if (selectedStores !== null && selectedStores.length === 0) return [];
+        if (selectedGenres !== null && selectedGenres.length === 0) return [];
         return getFilteredData(baseDashboardData, {
             areas: selectedArea !== '全エリア' ? [selectedArea] : undefined,
-            stores: selectedStore !== '全店舗' ? [selectedStore] : undefined,
-            genres: selectedGenre !== '全ジャンル' ? [selectedGenre] : undefined,
+            stores: selectedStores !== null ? selectedStores : undefined,
+            genres: selectedGenres !== null ? selectedGenres : undefined,
         });
-    }, [selectedArea, selectedStore, selectedGenre, baseDashboardData]);
+    }, [selectedArea, selectedStores, selectedGenres, baseDashboardData]);
 
     // KPI Calculations
     const totalSales = filteredData.reduce((sum, d) => sum + d.sales, 0);
@@ -261,43 +289,22 @@ export default function Dashboard() {
                             ))}
                         </div>
 
-                        {/* Start Month Select */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-500">START:</span>
-                            <div className="relative group">
-                                <select
-                                    value={selectedStartMonth ?? ''}
-                                    onChange={(e) => setSelectedStartMonth(e.target.value ? Number(e.target.value) : null)}
-                                    className="appearance-none bg-slate-900 border border-slate-800 text-slate-200 text-sm rounded-lg px-4 py-2 pr-10 outline-none focus:border-blue-500 transition-colors capitalize cursor-pointer font-medium"
-                                >
-                                    <option value="">開始 (Start)</option>
-                                    {availableMonths.map(m => <option key={m} value={m}>{m}月</option>)}
-                                </select>
-                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-hover:text-slate-200 transition-colors" />
-                            </div>
-                        </div>
+                        {/* Month multi-select */}
+                        <MultiSelectDropdown
+                            label="月"
+                            items={allMonths}
+                            selected={selectedMonths}
+                            onSelectAll={() => setSelectedMonths(null)}
+                            onClearAll={() => setSelectedMonths([])}
+                            onToggle={toggleMonth}
+                            countUnit="ヶ月"
+                        />
 
-                        {/* End Month Select */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-500">END:</span>
-                            <div className="relative group">
-                                <select
-                                    value={selectedEndMonth ?? ''}
-                                    onChange={(e) => setSelectedEndMonth(e.target.value ? Number(e.target.value) : null)}
-                                    className="appearance-none bg-slate-900 border border-slate-800 text-slate-200 text-sm rounded-lg px-4 py-2 pr-10 outline-none focus:border-blue-500 transition-colors capitalize cursor-pointer font-medium"
-                                >
-                                    <option value="">終了 (End)</option>
-                                    {availableMonths.map(m => <option key={m} value={m}>{m}月</option>)}
-                                </select>
-                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-hover:text-slate-200 transition-colors" />
-                            </div>
-                        </div>
-
-                        {/* Area Select */}
+                        {/* Area Select (single) */}
                         <div className="relative group">
                             <select
                                 value={selectedArea}
-                                onChange={(e) => { setSelectedArea(e.target.value); setSelectedStore('全店舗'); }}
+                                onChange={(e) => setSelectedArea(e.target.value)}
                                 className="appearance-none bg-slate-900 border border-slate-800 text-slate-200 text-sm rounded-lg px-4 py-2 pr-10 outline-none focus:border-blue-500 transition-colors cursor-pointer font-medium"
                             >
                                 {availableAreas.map(a => <option key={a} value={a}>{a}</option>)}
@@ -305,29 +312,25 @@ export default function Dashboard() {
                             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         </div>
 
-                        {/* Store Select */}
-                        <div className="relative group">
-                            <select
-                                value={selectedStore}
-                                onChange={(e) => setSelectedStore(e.target.value)}
-                                className="appearance-none bg-slate-900 border border-slate-800 text-slate-200 text-sm rounded-lg px-4 py-2 pr-10 outline-none focus:border-blue-500 transition-colors cursor-pointer font-medium"
-                            >
-                                {availableStores.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        </div>
+                        {/* Store multi-select */}
+                        <MultiSelectDropdown
+                            label="店舗"
+                            items={availableStores.map(s => ({ value: s, label: s }))}
+                            selected={selectedStores}
+                            onSelectAll={() => setSelectedStores(null)}
+                            onClearAll={() => setSelectedStores([])}
+                            onToggle={toggleStore}
+                        />
 
-                        {/* Genre Select */}
-                        <div className="relative group">
-                            <select
-                                value={selectedGenre}
-                                onChange={(e) => setSelectedGenre(e.target.value)}
-                                className="appearance-none bg-slate-900 border border-slate-800 text-slate-200 text-sm rounded-lg px-4 py-2 pr-10 outline-none focus:border-blue-500 transition-colors cursor-pointer font-medium"
-                            >
-                                {availableGenres.map(g => <option key={g} value={g}>{g}</option>)}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        </div>
+                        {/* Genre multi-select */}
+                        <MultiSelectDropdown
+                            label="ジャンル"
+                            items={availableGenres.map(g => ({ value: g, label: g }))}
+                            selected={selectedGenres}
+                            onSelectAll={() => setSelectedGenres(null)}
+                            onClearAll={() => setSelectedGenres([])}
+                            onToggle={toggleGenre}
+                        />
                     </div>
 
                     <div className={cn(
@@ -418,11 +421,10 @@ export default function Dashboard() {
                             <SummaryTab
                                 data={filteredData}
                                 allData={trendData}
-                                startMonth={selectedStartMonth}
-                                endMonth={selectedEndMonth}
+                                selectedMonths={selectedMonths}
                                 selectedArea={selectedArea}
-                                selectedStore={selectedStore}
-                                selectedGenre={selectedGenre}
+                                selectedStores={selectedStores}
+                                selectedGenres={selectedGenres}
                             />
                         )}
                         {activeTab === 'store' && (
@@ -435,8 +437,7 @@ export default function Dashboard() {
                             <GenreTab
                                 data={filteredData}
                                 allData={trendData}
-                                startMonth={selectedStartMonth}
-                                endMonth={selectedEndMonth}
+                                selectedMonths={selectedMonths}
                             />
                         )}
                     </div>

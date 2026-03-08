@@ -22,31 +22,28 @@ import { TrendingUp, CalendarDays } from 'lucide-react';
 interface Props {
     data: Transaction[]; // Fully filtered data (for the pie/genre chart)
     allData: Transaction[]; // Trend data (filtered by geometry/genre, but NOT year)
-    startMonth: number | null;
-    endMonth: number | null;
+    selectedMonths: number[] | null;
     selectedArea: string;
-    selectedStore: string;
-    selectedGenre: string;
+    selectedStores: string[] | null;
+    selectedGenres: string[] | null;
 }
 
 export default function SummaryTab({
     data,
     allData,
-    startMonth,
-    endMonth,
+    selectedMonths,
     selectedArea,
-    selectedStore,
-    selectedGenre,
+    selectedStores,
+    selectedGenres,
 }: Props) {
     const [hoveredGenre, setHoveredGenre] = useState<string | null>(null);
 
     // 過去5年の「同月」または「通期」比較用データ (Using allData passed from Dashboard)
     const comparisonDataRaw = useMemo(() => {
         return getFilteredData(allData, {
-            startMonth,
-            endMonth,
+            months: selectedMonths !== null ? selectedMonths : undefined,
         });
-    }, [startMonth, endMonth, allData]);
+    }, [selectedMonths, allData]);
 
     // 年別・ジャンル別の集計 (スタックバー用)
     const { yearlyGenreData, allGenresInComparison, genreColors } = useMemo(() => {
@@ -165,7 +162,7 @@ export default function SummaryTab({
                 <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-md">
                     <h3 className="text-sm font-semibold text-slate-400 mb-6 flex items-center gap-2">
                         <CalendarDays className="w-4 h-4" />
-                        年別売上構成推移 ({startMonth && endMonth ? `${startMonth}月〜${endMonth}月` : (startMonth ? `${startMonth}月〜` : (endMonth ? `〜${endMonth}月` : '通期'))})
+                        年別売上構成推移 ({selectedMonths && selectedMonths.length < 12 ? `選択月: ${selectedMonths.map(m => `${m}月`).join('・')}` : '通期'})
                     </h3>
                     <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
@@ -236,7 +233,7 @@ export default function SummaryTab({
                         <TrendingUp className="w-4 h-4 text-emerald-400" />
                         日別累積売上推移 (年別比較)
                     </h3>
-                    <div className="h-80 w-full">
+                    <div className="h-[30rem] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={cumulativeChartData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
@@ -256,8 +253,9 @@ export default function SummaryTab({
                                     tickFormatter={(val) => `¥${((val as number) / 10000).toLocaleString()}万`}
                                 />
                                 <Tooltip
-                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
-                                    formatter={(val: any) => [`¥${Number(val).toLocaleString()}`, '累積売上']}
+                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }}
+                                    formatter={(val: any, name: any) => [`¥${Number(val).toLocaleString()}`, String(name)]}
+                                    labelFormatter={(label) => `${label}日目`}
                                 />
                                 <Legend verticalAlign="top" height={36} />
                                 {yearsForLine.map((year, index) => (
@@ -267,9 +265,9 @@ export default function SummaryTab({
                                         dataKey={year.toString()}
                                         name={`${year}年`}
                                         stroke={['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'][index % 5]}
-                                        strokeWidth={2}
+                                        strokeWidth={2.5}
                                         dot={false}
-                                        activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }}
+                                        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
                                     />
                                 ))}
                             </LineChart>
