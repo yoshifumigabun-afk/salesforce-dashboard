@@ -24,31 +24,37 @@ export default function StaffTab({ data }: Props) {
     const [roleFilter, setRoleFilter] = useState<'all' | 'shooting' | 'select'>('all');
 
     const staffStats = useMemo(() => {
+        // We track sales and unique shoot IDs per staff member.
+        // Unit price = total actual sales / number of unique shoots handled.
         const map = new Map<string, { sales: number; shootIds: Set<string>; role: string; store: string }>();
 
         data.forEach(d => {
-            if (d.targetSales > 0) return; // 予算行はスキップ
+            // Skip budget records using the isBudget flag (not targetSales, which can be 0 for real records too)
+            if (d.isBudget) return;
+            // Skip records with no actual sales
+            if (d.sales <= 0) return;
 
-            // Shooting staff calculation
+            const shootKey = d.shootId || d.id;
+
+            // Shooting staff
             if ((roleFilter === 'all' || roleFilter === 'shooting') && d.shootingStaff && !d.shootingStaff.includes('不明')) {
                 const sKey = `撮:${d.shootingStaff}`;
                 const current = map.get(sKey) || { sales: 0, shootIds: new Set<string>(), role: '撮影', store: d.store };
-                if (d.shootId || d.id) current.shootIds.add(d.shootId || d.id);
-                // We assign half the 'sales' to shooting to roughly split revenue attribution between staff
+                current.shootIds.add(shootKey);
                 map.set(sKey, {
                     ...current,
-                    sales: current.sales + d.sales / 2,
+                    sales: current.sales + d.sales,
                 });
             }
 
-            // Select staff calculation
+            // Select staff
             if ((roleFilter === 'all' || roleFilter === 'select') && d.selectStaff && !d.selectStaff.includes('不明')) {
                 const sKey = `セ:${d.selectStaff}`;
                 const current = map.get(sKey) || { sales: 0, shootIds: new Set<string>(), role: 'セレクト', store: d.store };
-                if (d.shootId || d.id) current.shootIds.add(d.shootId || d.id);
+                current.shootIds.add(shootKey);
                 map.set(sKey, {
                     ...current,
-                    sales: current.sales + d.sales / 2,
+                    sales: current.sales + d.sales,
                 });
             }
         });
@@ -62,6 +68,7 @@ export default function StaffTab({ data }: Props) {
                 store: v.store,
                 sales: v.sales,
                 count: count,
+                // Unit price = actual sales ÷ unique shoot count (per shoot basis)
                 avgPrice: count > 0 ? Math.floor(v.sales / count) : 0,
             };
         }).sort((a, b) => b.sales - a.sales);
