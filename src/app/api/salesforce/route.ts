@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { fetchDashboardDataFromSalesforce } from '@/lib/salesforce/client';
 import { Transaction } from '@/lib/data';
 
-// Add Next.js Route cache options for performance (ISR/revalidation)
-export const revalidate = 3600; // Cache the API response for 1 hour (3600 seconds)
+// Force this route to be dynamic (server-rendered at request time).
+// This prevents Next.js from trying to pre-render it during build,
+// which would fail because it requires a live Salesforce connection.
+export const dynamic = 'force-dynamic';
+
 
 export async function GET() {
     try {
