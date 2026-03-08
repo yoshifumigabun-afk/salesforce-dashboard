@@ -9,16 +9,19 @@ import {
     Store,
     Users,
     TrendingUp,
+    Layers,
     Calendar,
     Filter,
     ChevronDown,
     Loader2,
-    Database
+    Database,
+    DollarSign
 } from 'lucide-react';
 
 import SummaryTab from './tabs/SummaryTab';
 import StoreTab from './tabs/StoreTab';
 import StaffTab from './tabs/StaffTab';
+import GenreTab from './tabs/GenreTab';
 import Login from './Login';
 
 // Tabs Definition
@@ -26,6 +29,7 @@ const TABS = [
     { id: 'summary', name: '全体サマリー & 年別比較', icon: TrendingUp },
     { id: 'store', name: '店舗別分析', icon: Store },
     { id: 'staff', name: '担当者分析', icon: Users },
+    { id: 'genre', name: 'ジャンル別分析', icon: Layers },
 ];
 
 export default function Dashboard() {
@@ -358,19 +362,16 @@ export default function Dashboard() {
 
                         <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 shadow-lg backdrop-blur-sm group hover:border-slate-700 transition-all">
                             <div className="flex justify-between items-start mb-4">
-                                <div className="text-slate-400 text-sm font-semibold tracking-wider">売上達成率<br />(ACHIEVEMENT)</div>
+                                <div className="text-slate-400 text-sm font-semibold tracking-wider">平均単価<br />(AVG. UNIT PRICE)</div>
                                 <div className="p-2 bg-emerald-500/10 rounded-lg group-hover:bg-emerald-500/20 transition-colors">
-                                    <TrendingUp className="w-5 h-5 text-emerald-400" />
+                                    <DollarSign className="w-5 h-5 text-emerald-400" />
                                 </div>
                             </div>
-                            <div className="text-3xl font-bold flex items-end gap-2 text-white">
-                                {achievementRate.toFixed(1)}<span className="text-xl text-slate-400 mb-0.5">%</span>
+                            <div className="text-3xl font-bold text-white">
+                                ¥{transactionCount > 0 ? Math.round(totalSales / transactionCount).toLocaleString() : '0'}
                             </div>
-                            <div className="mt-2 w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                <div
-                                    className={cn("h-full rounded-full", achievementRate >= 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "bg-blue-500")}
-                                    style={{ width: `${Math.min(achievementRate, 100)}%` }}
-                                />
+                            <div className="mt-2 text-xs text-slate-500 font-medium">
+                                撮影1件あたりの平均単価
                             </div>
                         </div>
 
@@ -408,6 +409,9 @@ export default function Dashboard() {
                         )}
                         {activeTab === 'staff' && (
                             <StaffTab data={filteredData} />
+                        )}
+                        {activeTab === 'genre' && (
+                            <GenreTab data={filteredData} allData={trendData} />
                         )}
                     </div>
                 </div>
