@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 import { fetchDashboardDataFromSalesforce } from '@/lib/salesforce/client';
 import { Transaction } from '@/lib/data';
+import { unstable_cache } from 'next/cache';
 
 // Force this route to be dynamic (server-rendered at request time).
 // This prevents Next.js from trying to pre-render it during build,
 // which would fail because it requires a live Salesforce connection.
 export const dynamic = 'force-dynamic';
 
+// Cache the raw Salesforce records for 1 hour (3600 seconds).
+// This means only the first request per hour hits Salesforce; all others are instant.
+const getCachedSalesforceData = unstable_cache(
+    async () => {
+        return fetchDashboardDataFromSalesforce();
+    },
+    ['salesforce-dashboard-data'],
+    { revalidate: 3600 }
+);
 
 export async function GET() {
     try {
@@ -22,8 +32,8 @@ export async function GET() {
             });
         }
 
-        // 2. Salesforceから本番データを取得
-        const records = await fetchDashboardDataFromSalesforce();
+        // 2. Salesforceから本番データを取得（キャッシュ付き）
+        const records = await getCachedSalesforceData();
 
         // 3. SalesforceのSOQLレスポンスをDashboard UI用の`Transaction`型にマッピング
         const mappedData: Transaction[] = records.map((record: any, index: number) => {

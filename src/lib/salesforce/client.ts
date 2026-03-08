@@ -53,7 +53,11 @@ export const getSalesforceConnection = async () => {
 export const fetchDashboardDataFromSalesforce = async () => {
     const connection = await getSalesforceConnection();
 
-    // ユーザー指定: 2026年2月以降のデータを全件取得する
+    // Dynamically compute start date: 5 years ago from today
+    const fiveYearsAgo = new Date();
+    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+    const startDateStr = fiveYearsAgo.toISOString().split('T')[0]; // e.g. "2021-03-08"
+
     const soql = `
     SELECT Id, PhotographingInformation__c, AmountTax__c, SalesDate__c, Store__c,
            MajorDivisions__c, Broad_division__c, BudgetAmountTax__c,
@@ -62,13 +66,12 @@ export const fetchDashboardDataFromSalesforce = async () => {
            PhotographingInformation__r.Photographer__r.Name,
            PhotographingInformation__r.Selector__r.Name
     FROM OrderDetails__c
-    WHERE SalesDate__c >= 2021-01-01
+    WHERE SalesDate__c >= ${startDateStr}
     ORDER BY SalesDate__c DESC
   `;
 
-    console.log(`Executing Custom Object SOQL: ${soql}`);
+    console.log(`Executing SOQL (from ${startDateStr}): ${soql}`);
 
-    // JSForce's autoFetch to grab more than 2000 records if they exist since 2026-02
     const records: SFOrderDetail[] = [];
     await new Promise<void>((resolve, reject) => {
         connection.query<SFOrderDetail>(soql)
@@ -81,7 +84,7 @@ export const fetchDashboardDataFromSalesforce = async () => {
             .on("error", (err) => {
                 reject(err);
             })
-            .run({ autoFetch: true, maxFetch: 500000 }); // Increased limit to fetch older historical data
+            .run({ autoFetch: true, maxFetch: 200000 }); // 5-year range, reduced from 500k
     });
 
     return records;
