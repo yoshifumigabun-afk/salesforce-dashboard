@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 interface Props {
     data: Transaction[];        // filtered data (years, months, area, store)
     allData: Transaction[];     // all data filtered only by area/store, used for year-by-year comparisons
+    startMonth: number | null;  // from global filter – applied to drilldown year comparison
+    endMonth: number | null;    // from global filter – applied to drilldown year comparison
 }
 
 // ─── Category definitions (same as StoreTab) ─────────────────────────────────
@@ -103,13 +105,24 @@ function DeltaBadge({ value }: { value: number | null }) {
 }
 
 // ─── Category drilldown modal ─────────────────────────────────────────────────
-function CategoryDrilldown({ cat, allData, availableYears, onClose }: {
+function CategoryDrilldown({ cat, allData, availableYears, startMonth, endMonth, onClose }: {
     cat: typeof CATEGORIES[0];
     allData: Transaction[];
     availableYears: number[];
+    startMonth: number | null;
+    endMonth: number | null;
     onClose: () => void;
 }) {
-    const yearStats = useMemo(() => buildCategoryYearStats(allData, cat.match), [allData, cat]);
+    // Apply the same month-range filter as the global filter so yearly comparison is period-aware
+    const periodData = useMemo(() => {
+        return allData.filter(d => {
+            if (startMonth && d.month < startMonth) return false;
+            if (endMonth && d.month > endMonth) return false;
+            return true;
+        });
+    }, [allData, startMonth, endMonth]);
+
+    const yearStats = useMemo(() => buildCategoryYearStats(periodData, cat.match), [periodData, cat]);
 
     const chartData = availableYears.map(year => {
         const s = yearStats.get(year);
@@ -212,7 +225,7 @@ function CategoryDrilldown({ cat, allData, availableYears, onClose }: {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function GenreTab({ data, allData }: Props) {
+export default function GenreTab({ data, allData, startMonth, endMonth }: Props) {
     const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[0] | null>(null);
 
     const availableYears = useMemo(() => {
@@ -386,6 +399,8 @@ export default function GenreTab({ data, allData }: Props) {
                     cat={selectedCategory}
                     allData={allData}
                     availableYears={availableYears}
+                    startMonth={startMonth}
+                    endMonth={endMonth}
                     onClose={() => setSelectedCategory(null)}
                 />
             )}

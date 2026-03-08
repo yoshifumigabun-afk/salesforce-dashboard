@@ -432,7 +432,12 @@ export default function Dashboard() {
                             <StaffTab data={filteredData} />
                         )}
                         {activeTab === 'genre' && (
-                            <GenreTab data={filteredData} allData={trendData} />
+                            <GenreTab
+                                data={filteredData}
+                                allData={trendData}
+                                startMonth={selectedStartMonth}
+                                endMonth={selectedEndMonth}
+                            />
                         )}
                     </div>
                 </div>
