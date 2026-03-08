@@ -81,7 +81,7 @@ export const fetchDashboardDataFromSalesforce = async () => {
             .on("error", (err) => {
                 reject(err);
             })
-            .run({ autoFetch: true, maxFetch: 50000 }); // Limit safely below API limits
+            .run({ autoFetch: true, maxFetch: 500000 }); // Increased limit to fetch older historical data
     });
 
     return records;
